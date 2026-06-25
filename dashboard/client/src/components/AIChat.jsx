@@ -113,6 +113,128 @@ function renderSuggestedFix(text) {
   return null
 }
 
+function StructuredAnalysisCard({ data }) {
+  const { errorType, affectedFile, lineNumber, functionName, rootCause, suggestedFix, prevention } = data
+
+  return (
+    <div style={{
+      width: '100%',
+      backgroundColor: 'var(--bg-tertiary)',
+      border: '1px solid var(--border-color)',
+      borderRadius: '8px',
+      padding: '18px',
+      marginBottom: '18px',
+      boxShadow: 'var(--shadow-md)',
+      fontFamily: 'var(--font-sans)',
+      animation: 'highlight-glow 2s ease-out',
+    }}>
+      {/* Header */}
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: '10px',
+        borderBottom: '1px solid var(--border-color)',
+        paddingBottom: '12px',
+        marginBottom: '14px',
+      }}>
+        {/* Styled warning/bug icon */}
+        <svg style={{ width: 20, height: 20, color: 'var(--error)', flexShrink: 0 }} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+          <line x1="12" y1="9" x2="12" y2="13" />
+          <line x1="12" y1="17" x2="12.01" y2="17" />
+        </svg>
+        <div>
+          <span style={{
+            fontSize: '10px',
+            fontWeight: 700,
+            textTransform: 'uppercase',
+            color: 'var(--error)',
+            display: 'block',
+            letterSpacing: '0.8px',
+            marginBottom: '2px',
+          }}>
+            AI Root Cause Analysis
+          </span>
+          <span style={{
+            fontSize: '15px',
+            fontWeight: 700,
+            color: 'var(--text-main)',
+          }}>
+            {errorType || 'Runtime Error'}
+          </span>
+        </div>
+      </div>
+
+      {/* Code Path Tag */}
+      {affectedFile && affectedFile !== 'unknown' && (
+        <div style={{
+          backgroundColor: 'var(--bg-primary)',
+          border: '1px solid var(--border-color)',
+          borderRadius: '6px',
+          padding: '8px 12px',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '4px',
+          marginBottom: '16px',
+        }}>
+          <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Location:</span>
+          <code style={{
+            fontFamily: 'var(--font-mono)',
+            fontSize: '12px',
+            color: 'var(--accent)',
+            wordBreak: 'break-all',
+          }}>
+            {affectedFile}{lineNumber && lineNumber !== 'unknown' ? `:${lineNumber}` : ''}{functionName && functionName !== 'unknown' ? ` (in ${functionName})` : ''}
+          </code>
+        </div>
+      )}
+
+      {/* What Happened */}
+      <div style={{ marginBottom: '16px' }}>
+        <h4 style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: '6px' }}>
+          What Happened
+        </h4>
+        <p style={{ fontSize: '13px', color: 'var(--text-main)', lineHeight: '1.65', margin: 0 }}>
+          {rootCause}
+        </p>
+      </div>
+
+      {/* Suggested Fix */}
+      {suggestedFix && (
+        <div style={{ marginBottom: '16px' }}>
+          <h4 style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: '6px' }}>
+            Suggested Fix
+          </h4>
+          <div style={{ marginTop: '8px' }}>
+            {renderSuggestedFix(suggestedFix)}
+          </div>
+        </div>
+      )}
+
+      {/* Prevention Tip */}
+      {prevention && (
+        <div style={{
+          backgroundColor: 'rgba(16, 185, 129, 0.04)',
+          border: '1px solid rgba(16, 185, 129, 0.15)',
+          borderRadius: '6px',
+          padding: '14px',
+          marginTop: '18px',
+        }}>
+          <h4 style={{ fontSize: '11px', fontWeight: 700, color: 'var(--success)', textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '6px', margin: 0 }}>
+            <svg style={{ width: 14, height: 14, flexShrink: 0 }} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+            </svg>
+            Prevention Tip
+          </h4>
+          <p style={{ fontSize: '12.5px', color: 'var(--text-main)', lineHeight: '1.6', margin: '6px 0 0 0' }}>
+            {prevention}
+          </p>
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function AIChat({ crash }) {
   const [messages, setMessages] = useState([])
   const [input, setInput] = useState('')
@@ -203,24 +325,34 @@ export default function AIChat({ crash }) {
           </div>
         )}
 
-        {messages.map((msg, i) => (
-          <div key={i} style={{ display: 'flex', justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start' }}>
-            <div style={{
-              maxWidth: '90%',
-              padding: '10px 13px',
-              borderRadius: msg.role === 'user' ? '14px 14px 3px 14px' : '3px 14px 14px 14px',
-              background: msg.role === 'user' ? '#f5f5f5' : '#161616',
-              color: msg.role === 'user' ? '#0a0a0a' : '#ccc',
-              fontSize: '13px',
-              lineHeight: 1.65,
-              whiteSpace: 'pre-wrap',
-              wordBreak: 'break-word',
-              border: msg.role === 'user' ? 'none' : '1px solid #1f1f1f',
-            }}>
-              {msg.content}
+        {messages.map((msg, i) => {
+          const parsedJson = msg.role === 'assistant' ? tryParseJSON(msg.content) : null
+
+          if (parsedJson) {
+            return (
+              <StructuredAnalysisCard key={i} data={parsedJson} />
+            )
+          }
+
+          return (
+            <div key={i} style={{ display: 'flex', justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start', marginBottom: 14, width: '100%' }}>
+              <div style={{
+                maxWidth: '90%',
+                padding: '10px 13px',
+                borderRadius: msg.role === 'user' ? '14px 14px 3px 14px' : '3px 14px 14px 14px',
+                background: msg.role === 'user' ? '#f5f5f5' : '#161616',
+                color: msg.role === 'user' ? '#0a0a0a' : '#ccc',
+                fontSize: '13px',
+                lineHeight: 1.65,
+                whiteSpace: 'pre-wrap',
+                wordBreak: 'break-word',
+                border: msg.role === 'user' ? 'none' : '1px solid #1f1f1f',
+              }}>
+                {msg.content}
+              </div>
             </div>
-          </div>
-        ))}
+          )
+        })}
         <div ref={messagesEndRef} />
       </div>
 
