@@ -30,11 +30,27 @@ Crash payload is sent to the dashboard server
         |
 Dashboard saves to MongoDB and notifies React via Socket.io
         |
-Groq LLM analyses the crash and streams an explanation
+Groq LLM generates a structured JSON crash analysis
         |
-Developer sees the crash, the code, and the AI explanation
-in real time — and can ask follow-up questions
+Dashboard renders the structured AI diagnostics card
+and developer can ask follow-up questions via live stream
 ```
+
+---
+
+## Structured AI Diagnostics
+
+CrashSense leverages Llama 3.3 70B on Groq using strict **JSON Mode** to convert messy runtime crashes into structured, reliable telemetry. Instead of raw text blocks, the AI returns a parsed JSON payload with the following fields:
+
+* **`errorType`** — Categorized error class (e.g., `TypeError`, `ReferenceError`).
+* **`affectedFile`** — The exact file path that caused the crash.
+* **`lineNumber`** — The exact source code line number.
+* **`functionName`** — The executing function scope.
+* **`rootCause`** — A plain-English, jargon-free explanation of the error.
+* **`suggestedFix`** — A comparative before/after code fix payload.
+* **`prevention`** — A preventative tip to avoid similar bugs in the future.
+
+This structured output is parsed on the React frontend and rendered in an interactive card featuring syntax-highlighted code comparisons.
 
 ---
 
@@ -255,6 +271,16 @@ The dashboard is designed for free deployment with no infrastructure cost.
 - **AI** — Groq API free tier (14,400 requests per day)
 
 After deployment, update the `dashboardUrl` in your middleware configuration to point to your Render.com URL.
+
+---
+
+## Zero-Overhead & Async Reporting Architecture
+
+CrashSense is designed to run in production environments with **zero overhead** on your HTTP request lifecycle and server availability:
+
+1. **Non-Blocking Fire-and-Forget Reporting**: The middleware captures and parses the crash context synchronously, but transmits the payload to the dashboard backend asynchronously without using `await`. It immediately routes execution to the next Express error handler using `next(err)`. This ensures that your client's HTTP response is never delayed by the monitoring tool's network latency.
+2. **Strict Timeouts**: To prevent slow network connections to the dashboard server from locking up Node.js sockets or holding memory, the reporter client implements a hard-coded HTTP timeout (default `3000ms`).
+3. **Preventing Zombie Processes**: When Node.js experiences a critical unhandled exception, the process is left in an unstable state. CrashSense allows your server to report the telemetry immediately before the process manager (like PM2 or Docker) restarts the process. This prevents "zombie" processes that leak memory or fail to respond to health check pings.
 
 ---
 
