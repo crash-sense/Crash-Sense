@@ -3,6 +3,116 @@ import { useSocket } from '../hooks/useSocket'
 import apiClient from '../api/client'
 import { Sparkles, Send, Loader2 } from 'lucide-react'
 
+function tryParseJSON(str) {
+  if (!str) return null
+  const trimmed = str.trim()
+  if (!trimmed.startsWith('{') || !trimmed.endsWith('}')) return null
+  try {
+    return JSON.parse(trimmed)
+  } catch (e) {
+    return null
+  }
+}
+
+function renderSuggestedFix(text) {
+  if (!text) return null
+
+  // If text is an object (like { before: "...", after: "..." }), format it nicely
+  if (typeof text === 'object') {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+        {text.before && (
+          <div>
+            <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', display: 'block', marginBottom: '4px' }}>Before:</span>
+            <pre style={{
+              backgroundColor: 'var(--bg-primary)',
+              border: '1px solid var(--border-color)',
+              borderRadius: '6px',
+              padding: '10px',
+              margin: 0,
+              fontFamily: 'var(--font-mono)',
+              fontSize: '12px',
+              color: 'var(--error)',
+              overflowX: 'auto',
+              whiteSpace: 'pre',
+            }}>
+              <code>{text.before}</code>
+            </pre>
+          </div>
+        )}
+        {text.after && (
+          <div>
+            <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', display: 'block', marginBottom: '4px' }}>After:</span>
+            <pre style={{
+              backgroundColor: 'var(--bg-primary)',
+              border: '1px solid var(--border-color)',
+              borderRadius: '6px',
+              padding: '10px',
+              margin: 0,
+              fontFamily: 'var(--font-mono)',
+              fontSize: '12px',
+              color: '#34d399',
+              overflowX: 'auto',
+              whiteSpace: 'pre',
+            }}>
+              <code>{text.after}</code>
+            </pre>
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  // If text is a string, check if it contains markdown code blocks
+  if (typeof text === 'string') {
+    const codeBlockRegex = /```(?:javascript|js|json|html|css)?([\s\S]*?)```/g
+    const parts = []
+    let lastIndex = 0
+    let match
+
+    while ((match = codeBlockRegex.exec(text)) !== null) {
+      if (match.index > lastIndex) {
+        parts.push(
+          <p key={`text-${lastIndex}`} style={{ margin: '0 0 10px 0', color: 'var(--text-main)', fontSize: 13, lineHeight: 1.65 }}>
+            {text.substring(lastIndex, match.index)}
+          </p>
+        )
+      }
+      const code = match[1].trim()
+      parts.push(
+        <pre key={`code-${match.index}`} style={{
+          backgroundColor: 'var(--bg-primary)',
+          border: '1px solid var(--border-color)',
+          borderRadius: '6px',
+          padding: '12px',
+          margin: '0 0 14px 0',
+          fontFamily: 'var(--font-mono)',
+          fontSize: '12px',
+          color: '#34d399',
+          overflowX: 'auto',
+          lineHeight: 1.5,
+          whiteSpace: 'pre',
+        }}>
+          <code>{code}</code>
+        </pre>
+      )
+      lastIndex = codeBlockRegex.lastIndex
+    }
+
+    if (lastIndex < text.length) {
+      parts.push(
+        <p key={`text-end-${lastIndex}`} style={{ margin: 0, color: 'var(--text-main)', fontSize: 13, lineHeight: 1.65 }}>
+          {text.substring(lastIndex)}
+        </p>
+      )
+    }
+
+    return parts.length > 0 ? parts : <p style={{ margin: 0 }}>{text}</p>
+  }
+
+  return null
+}
+
 export default function AIChat({ crash }) {
   const [messages, setMessages] = useState([])
   const [input, setInput] = useState('')
