@@ -82,54 +82,49 @@ ENVIRONMENT:
 
 // ─── analyseWithGroq ──────────────────────────────────────────────────────────
 // Called automatically when a new crash arrives
-// Streams the first AI explanation token by token via Socket.io
-// Caches the full response on the crash document in MongoDB
+// Waits for complete structured JSON response and saves to MongoDB
 async function analyseWithGroq(crash, io) {
   const crashContext = buildCrashContext(crash)
 
-  const stream = await groq.chat.completions.create({
-    model: MODEL,
-    messages: [
-      {
-        role: 'system',
-        content: buildSystemPrompt(),
-      },
-      {
-        role: 'user',
-        content: `Please analyse this crash and explain what went wrong:\n${crashContext}`,
-      },
-    ],
-    stream: true,
-    max_tokens: 1024,
-    // Lower temperature = more focused and factual responses
-    // Higher temperature = more creative but less reliable
-    // 0.3 is ideal for debugging explanations
-    temperature: 0.3,
-  })
+  try {
+    const chatCompletion = await groq.chat.completions.create({
+      model: MODEL,
+      messages: [
+        {
+          role: 'system',
+          content: buildInitialAnalysisSystemPrompt(),
+        },
+        {
+          role: 'user',
+          content: `Please analyse this crash and return a JSON object:\n${crashContext}`,
+        },
+      ],
+      response_format: { type: 'json_object' },
+      max_tokens: 1024,
+      temperature: 0.2,
+    })
 
-  let fullResponse = ''
+    const fullResponse = chatCompletion.choices[0]?.message?.content || '{}'
 
-  // Each chunk contains one token (a word or part of a word)
-  // We emit it immediately so React can show it appearing word by word
-  for await (const chunk of stream) {
-    const token = chunk.choices[0]?.delta?.content || ''
-    if (token) {
-      fullResponse += token
-      // Event name includes crashId so React knows which crash this belongs to
-      // Multiple crashes can be open at once — the ID keeps streams separate
-      io.emit(`analysis:token:${crash._id}`, token)
-    }
+    // Emit the full JSON response as a single token event so frontend receives it whole
+    io.emit(`analysis:token:${crash._id}`, fullResponse)
+
+    // Tell React the analysis is finished
+    io.emit(`analysis:done:${crash._id}`)
+
+    // Cache the full response in MongoDB
+    await Crash.findByIdAndUpdate(crash._id, { aiAnalysis: fullResponse })
+
+    return fullResponse
+  } catch (err) {
+    console.error('Error during Groq initial analysis:', err)
+
+    // Fallback to text explanation if JSON mode fails
+    const fallbackText = `{"errorType": "${crash.name || 'Error'}", "affectedFile": "unknown", "lineNumber": "unknown", "functionName": "unknown", "rootCause": "Failed to run AI analysis: ${err.message.replace(/"/g, '\\"')}", "suggestedFix": "", "prevention": ""}`
+    io.emit(`analysis:token:${crash._id}`, fallbackText)
+    io.emit(`analysis:done:${crash._id}`)
+    return fallbackText
   }
-
-  // Tell React the stream is finished
-  io.emit(`analysis:done:${crash._id}`)
-
-  // Cache the full response in MongoDB
-  // Next time this crash is opened — we return the cached version
-  // instead of calling Groq again (saves API calls)
-  await Crash.findByIdAndUpdate(crash._id, { aiAnalysis: fullResponse })
-
-  return fullResponse
 }
 
 // ─── chatWithGroq ─────────────────────────────────────────────────────────────
