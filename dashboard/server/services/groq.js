@@ -7,7 +7,25 @@ const groq = new Groq({ apiKey: process.env.GROQ_API_KEY })
 
 const MODEL = 'llama-3.3-70b-versatile'
 
-// ─── System Prompt ────────────────────────────────────────────────────────────
+// ─── System Prompt for Initial JSON Analysis ──────────────────────────────────
+function buildInitialAnalysisSystemPrompt() {
+  return `You are an expert Node.js and Express.js debugger built into CrashSense, a real-time crash monitoring tool.
+
+When given a crash report, you must analyze the error and return a JSON object with the following fields:
+{
+  "errorType": "The type of error (e.g. TypeError, ReferenceError, etc.)",
+  "affectedFile": "The file path where the error occurred",
+  "lineNumber": "The line number where the error occurred",
+  "functionName": "The function name where the error occurred",
+  "rootCause": "A clear, plain-English explanation of why this error happened",
+  "suggestedFix": "A markdown block showing the corrected code, comparing 'Before' and 'After'",
+  "prevention": "One practical tip to prevent this class of error in the future"
+}
+
+You must return ONLY the raw JSON object. Do not include any markdown formatting, backticks, or explanation outside the JSON.`
+}
+
+// ─── System Prompt for Chat ───────────────────────────────────────────────────
 // This tells Groq how to behave for every conversation
 // Think of it as the personality and rules of your AI debugger
 function buildSystemPrompt() {
