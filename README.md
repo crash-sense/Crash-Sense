@@ -1,5 +1,7 @@
 # CrashSense
 
+[![Live Demo](https://img.shields.io/badge/Live_Demo-crash--sense.vercel.app-success?style=for-the-badge)](https://crash-sense.vercel.app/)
+
 A runtime AI debugger for Express.js applications. CrashSense intercepts server crashes the moment they happen, parses the V8 stack trace, and delivers a real-time AI-powered explanation through a browser-based dashboard — without any IDE or manual log digging.
 
 ---
