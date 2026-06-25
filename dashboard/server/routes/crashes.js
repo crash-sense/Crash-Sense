@@ -47,6 +47,28 @@ router.get('/', async (req, res) => {
   }
 })
 
+// GET /api/crashes/source
+// Fetch local file content to display on the dashboard code viewer
+router.get('/source', async (req, res) => {
+  try {
+    const filePath = req.query.filePath
+    if (!filePath) {
+      return res.status(400).json({ error: 'filePath is required' })
+    }
+
+    const fs = require('fs')
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({ error: 'File not found on disk' })
+    }
+
+    const content = fs.readFileSync(filePath, 'utf-8')
+    res.json({ content })
+  } catch (err) {
+    console.error('Failed to read source file:', err.message)
+    res.status(500).json({ error: 'Failed to read source file' })
+  }
+})
+
 // GET /api/crashes/:id
 // React fetches single crash when user clicks it
 router.get('/:id', async (req, res) => {
