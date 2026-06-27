@@ -37,6 +37,11 @@ const crashSchema = new mongoose.Schema({
   frames: [frameSchema],
   request: requestSchema,
   environment: environmentSchema,
+  sourceSnippet: {
+    content: { type: String },
+    startLine: { type: Number },
+    errorLine: { type: Number },
+  },
   aiAnalysis: { type: String, default: '' },
   occurrenceCount: { type: Number, default: 1 },
 }, { timestamps: true })

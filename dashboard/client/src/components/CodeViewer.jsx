@@ -10,15 +10,26 @@ export default function CodeViewer({ crash }) {
   const [sourceError, setSourceError] = useState(null)
 
   const topFrame = crash?.frames?.[0]
+  const startLine = crash?.sourceSnippet?.startLine || 1
+  const editorErrorLine = topFrame?.line 
+    ? (crash?.sourceSnippet ? topFrame.line - startLine + 1 : topFrame.line)
+    : null
 
   useEffect(() => {
+    if (crash?.sourceSnippet?.content) {
+      setSourceCode(crash.sourceSnippet.content)
+      setLoadingSource(false)
+      setSourceError(null)
+      return
+    }
+
     if (!topFrame || !topFrame.file || topFrame.file === 'unknown') { setSourceCode(null); return }
     setLoadingSource(true); setSourceError(null)
     apiClient.get('/crashes/source', { params: { filePath: topFrame.file } })
       .then(res => setSourceCode(res.data.content))
       .catch(() => setSourceError('Source code unavailable.'))
       .finally(() => setLoadingSource(false))
-  }, [topFrame])
+  }, [crash, topFrame])
 
   const tabBtn = (id, label, Icon) => (
     <button
@@ -111,11 +122,18 @@ export default function CodeViewer({ crash }) {
                 language="javascript"
                 theme="vs-dark"
                 value={sourceCode}
-                options={{ readOnly: true, minimap: { enabled: false }, scrollBeyondLastLine: false, lineNumbers: 'on', wordWrap: 'on', fontSize: 13 }}
+                options={{ 
+                  readOnly: true, 
+                  minimap: { enabled: false }, 
+                  scrollBeyondLastLine: false, 
+                  lineNumbers: (num) => String(num + startLine - 1), 
+                  wordWrap: 'on', 
+                  fontSize: 13 
+                }}
                 onMount={(editor) => {
-                  if (topFrame?.line) setTimeout(() => {
-                    editor.revealLineInCenter(topFrame.line)
-                    editor.setPosition({ lineNumber: topFrame.line, column: topFrame.column || 1 })
+                  if (editorErrorLine) setTimeout(() => {
+                    editor.revealLineInCenter(editorErrorLine)
+                    editor.setPosition({ lineNumber: editorErrorLine, column: topFrame.column || 1 })
                   }, 100)
                 }}
               />

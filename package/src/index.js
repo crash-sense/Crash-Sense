@@ -2,9 +2,31 @@
 
 'use strict'
 
+const fs = require('fs')
 const { parseStack } = require('./stackParser')
 const { extractContext } = require('./context')
 const { sendReport } = require('./reporter')
+
+function readSourceCode(filePath, lineNum, contextLines = 15) {
+  if (!filePath || filePath === 'unknown' || typeof lineNum !== 'number') return null
+  try {
+    if (!fs.existsSync(filePath)) return null
+    const content = fs.readFileSync(filePath, 'utf-8')
+    const lines = content.split(/\r?\n/)
+    
+    const start = Math.max(0, lineNum - 1 - contextLines)
+    const end = Math.min(lines.length, lineNum - 1 + contextLines + 1)
+    
+    return {
+      content: lines.slice(start, end).join('\n'),
+      startLine: start + 1,
+      errorLine: lineNum
+    }
+  } catch (err) {
+    console.error('[crashsense] Failed to read source snippet:', err.message)
+    return null
+  }
+}
 
 function crashsense(config = {}) {
 
@@ -32,6 +54,12 @@ function crashsense(config = {}) {
       const frames = parseStack(err, options.maxFrames)
       const context = extractContext(req, options.sanitize)
 
+      let sourceSnippet = null
+      if (frames && frames.length > 0) {
+        const topFrame = frames[0]
+        sourceSnippet = readSourceCode(topFrame.file, topFrame.line)
+      }
+
       const payload = {
         projectId: options.projectId,
         message: err.message,
@@ -40,6 +68,7 @@ function crashsense(config = {}) {
         frames,
         request: context.request,
         environment: context.environment,
+        sourceSnippet,
         timestamp: new Date().toISOString(),
       }
 
