@@ -1,11 +1,22 @@
 {
   "name": "crashsense",
-  "version": "1.0.0",
+  "version": "1.0.4",
   "description": "Runtime AI debugger middleware for Express.js",
   "main": "src/index.js",
-  "files": ["src", "README.md"],
-  "keywords": ["express", "middleware", "debugging", "ai", "error-handling"],
-  "engines": { "node": ">=16.0.0" },
+  "files": [
+    "src",
+    "README.md"
+  ],
+  "keywords": [
+    "express",
+    "middleware",
+    "debugging",
+    "ai",
+    "error-handling"
+  ],
+  "engines": {
+    "node": ">=16.0.0"
+  },
   "scripts": {
     "test": "jest",
     "test:watch": "jest --watch",
