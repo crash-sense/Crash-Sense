@@ -1,6 +1,6 @@
 {
-  "name": "crashsense",
-  "version": "1.0.4",
+  "name": "crashsense-agent",
+  "version": "1.0.0",
   "description": "Runtime AI debugger middleware for Express.js",
   "main": "src/index.js",
   "files": [

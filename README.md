@@ -184,14 +184,14 @@ npm run dev
 ### Install the npm package in any Express app
 
 ```bash
-npm install crashsense
+npm install crashsense-agent
 ```
 
 Add to your Express application:
 
 ```js
 const express = require('express')
-const crashsense = require('crashsense')
+const crashsense = require('crashsense-agent')
 
 const app = express()
 
