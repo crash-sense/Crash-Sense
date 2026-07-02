@@ -27,7 +27,7 @@ export default function CodeViewer({ crash }) {
     setLoadingSource(true); setSourceError(null)
     apiClient.get('/crashes/source', { params: { filePath: topFrame.file } })
       .then(res => setSourceCode(res.data.content))
-      .catch(() => setSourceError('Source code unavailable.'))
+      .catch(() => setSourceError('Source code not available right now, currently in progress.'))
       .finally(() => setLoadingSource(false))
   }, [crash, topFrame])
 
@@ -141,7 +141,7 @@ export default function CodeViewer({ crash }) {
             {!loadingSource && !sourceError && !sourceCode && (
               <div style={{ height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '24px', textAlign: 'center' }}>
                 <FileCode style={{ width: '28px', height: '28px', marginBottom: '10px', color: '#333' }} />
-                <p style={{ fontSize: '13px', color: '#555' }}>Source code not available.</p>
+                <p style={{ fontSize: '13px', color: '#555' }}>Source code not available right now, currently in progress.</p>
               </div>
             )}
           </div>

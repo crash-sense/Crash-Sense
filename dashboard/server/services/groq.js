@@ -5,7 +5,7 @@ const Crash = require('../models/Crash')
 
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY })
 
-const MODEL = 'llama-3.3-70b-versatile'
+const MODEL = 'llama3-70b-8192'
 
 // ─── System Prompt for Initial JSON Analysis ──────────────────────────────────
 function buildInitialAnalysisSystemPrompt() {
