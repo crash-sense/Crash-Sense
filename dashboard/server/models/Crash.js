@@ -30,7 +30,16 @@ const environmentSchema = new mongoose.Schema({
 }, { _id: false })
 
 const crashSchema = new mongoose.Schema({
-  projectId: { type: String, required: true, index: true },
+  user: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    required: true,
+  },
+  projectId: {
+    type: String,
+    required: true,
+    index: true,
+  },
   message: { type: String, required: true },
   name: { type: String, default: 'Error' },
   stack: { type: String },

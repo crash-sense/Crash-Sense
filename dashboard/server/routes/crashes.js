@@ -10,14 +10,19 @@ const authMiddleware = require('../middleware/auth')
 // Receives crash from npm package
 router.post('/', authMiddleware, async (req, res) => {
   try {
-    const crash = new Crash(req.body)
+    const crash = new Crash({
+      ...req.body,
+      user: req.user._id // Attach to the user identified by API Key
+    })
     await crash.save()
 
-    // Tell React a new crash arrived — instantly
-    req.io.emit('new:crash', crash)
+    const room = req.user._id.toString()
+    
+    // Tell React a new crash arrived — instantly, only to this user
+    req.io.to(room).emit('new:crash', crash)
 
     // Run AI analysis in background — don't make package wait
-    analyseWithGroq(crash, req.io).catch((err) => {
+    analyseWithGroq(crash, req.io, room).catch((err) => {
       console.error('AI analysis failed:', err.message)
     })
 
@@ -30,10 +35,13 @@ router.post('/', authMiddleware, async (req, res) => {
 
 // GET /api/crashes
 // React dashboard fetches all crashes on load
-router.get('/', async (req, res) => {
+router.get('/', authMiddleware, async (req, res) => {
   try {
     const { projectId, page = 1, limit = 50 } = req.query
-    const query = projectId ? { projectId } : {}
+    
+    // Ensure we ONLY query this user's crashes
+    const query = { user: req.user._id }
+    if (projectId) query.projectId = projectId
 
     const crashes = await Crash.find(query)
       .sort({ createdAt: -1 })
@@ -49,7 +57,7 @@ router.get('/', async (req, res) => {
 
 // GET /api/crashes/source
 // Fetch local file content to display on the dashboard code viewer
-router.get('/source', async (req, res) => {
+router.get('/source', authMiddleware, async (req, res) => {
   try {
     const filePath = req.query.filePath
     if (!filePath) {
@@ -71,9 +79,9 @@ router.get('/source', async (req, res) => {
 
 // GET /api/crashes/:id
 // React fetches single crash when user clicks it
-router.get('/:id', async (req, res) => {
+router.get('/:id', authMiddleware, async (req, res) => {
   try {
-    const crash = await Crash.findById(req.params.id)
+    const crash = await Crash.findOne({ _id: req.params.id, user: req.user._id })
     if (!crash) return res.status(404).json({ error: 'Crash not found' })
     res.json(crash)
   } catch (err) {

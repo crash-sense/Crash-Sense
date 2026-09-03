@@ -6,13 +6,16 @@ const socketUrl = import.meta.env.VITE_WS_URL || 'http://localhost:5000'
 let socket = null
 
 /**
- * Get or initialize the singleton Socket.io instance
+ * Get or initialize the singleton Socket.io instance.
+ * Passes the JWT token for server-side authentication.
  */
 export const getSocket = () => {
   if (!socket) {
+    const token = localStorage.getItem('cs_token')
     socket = io(socketUrl, {
       withCredentials: true,
       autoConnect: true,
+      auth: { token }, // Send JWT token to server for authentication
     })
 
     socket.on('connect', () => {
@@ -28,6 +31,16 @@ export const getSocket = () => {
     })
   }
   return socket
+}
+
+/**
+ * Reset socket (call on logout to clear the instance)
+ */
+export const resetSocket = () => {
+  if (socket) {
+    socket.disconnect()
+    socket = null
+  }
 }
 
 /**

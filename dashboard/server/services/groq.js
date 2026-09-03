@@ -5,7 +5,7 @@ const Crash = require('../models/Crash')
 
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY })
 
-const MODEL = 'llama3-70b-8192'
+const MODEL = 'groq/compound-mini'
 
 // ─── System Prompt for Initial JSON Analysis ──────────────────────────────────
 function buildInitialAnalysisSystemPrompt() {
@@ -83,7 +83,7 @@ ENVIRONMENT:
 // ─── analyseWithGroq ──────────────────────────────────────────────────────────
 // Called automatically when a new crash arrives
 // Waits for complete structured JSON response and saves to MongoDB
-async function analyseWithGroq(crash, io) {
+async function analyseWithGroq(crash, io, room) {
   const crashContext = buildCrashContext(crash)
 
   try {
@@ -107,10 +107,10 @@ async function analyseWithGroq(crash, io) {
     const fullResponse = chatCompletion.choices[0]?.message?.content || '{}'
 
     // Emit the full JSON response as a single token event so frontend receives it whole
-    io.emit(`analysis:token:${crash._id}`, fullResponse)
+    io.to(room).emit(`analysis:token:${crash._id}`, fullResponse)
 
     // Tell React the analysis is finished
-    io.emit(`analysis:done:${crash._id}`)
+    io.to(room).emit(`analysis:done:${crash._id}`)
 
     // Cache the full response in MongoDB
     await Crash.findByIdAndUpdate(crash._id, { aiAnalysis: fullResponse })
@@ -121,8 +121,8 @@ async function analyseWithGroq(crash, io) {
 
     // Fallback to text explanation if JSON mode fails
     const fallbackText = `{"errorType": "${crash.name || 'Error'}", "affectedFile": "unknown", "lineNumber": "unknown", "functionName": "unknown", "rootCause": "Failed to run AI analysis: ${err.message.replace(/"/g, '\\"')}", "suggestedFix": "", "prevention": ""}`
-    io.emit(`analysis:token:${crash._id}`, fallbackText)
-    io.emit(`analysis:done:${crash._id}`)
+    io.to(room).emit(`analysis:token:${crash._id}`, fallbackText)
+    io.to(room).emit(`analysis:done:${crash._id}`)
     return fallbackText
   }
 }
@@ -131,7 +131,7 @@ async function analyseWithGroq(crash, io) {
 // Called when user sends a follow-up question in the chat
 // Sends FULL conversation history every time because Groq has no memory
 // between separate API calls — it is completely stateless
-async function chatWithGroq(crash, messages, io, crashId) {
+async function chatWithGroq(crash, messages, io, crashId, room) {
   const crashContext = buildCrashContext(crash)
 
   // Build the full message array for Groq
@@ -174,11 +174,11 @@ async function chatWithGroq(crash, messages, io, crashId) {
     const token = chunk.choices[0]?.delta?.content || ''
     if (token) {
       fullResponse += token
-      io.emit(`chat:token:${crashId}`, token)
+      io.to(room).emit(`chat:token:${crashId}`, token)
     }
   }
 
-  io.emit(`chat:done:${crashId}`)
+  io.to(room).emit(`chat:done:${crashId}`)
 
   return fullResponse
 }

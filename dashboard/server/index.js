@@ -11,6 +11,9 @@ const mongoose = require('mongoose')
 
 const crashesRouter = require('./routes/crashes')
 const chatRouter = require('./routes/chat')
+const authRouter = require('./routes/auth')
+const packagesRouter = require('./routes/packages')
+const codeRouter = require('./routes/code')
 
 const app = express()
 const server = http.createServer(app)
@@ -69,12 +72,33 @@ app.get('/health', (req, res) => {
 })
 
 // Bind routes
+app.use('/api/auth', authRouter)
 app.use('/api/crashes', crashesRouter)
 app.use('/api/chat', chatRouter)
+app.use('/api/packages', packagesRouter)
+app.use('/api/code', codeRouter)
 
-// Monitor Socket.io connections
+// Monitor Socket.io connections with Auth
+const jwt = require('jsonwebtoken')
+const JWT_SECRET = process.env.JWT_SECRET || 'super_secret_jwt_key_crashsense_2026'
+
+io.use((socket, next) => {
+  const token = socket.handshake.auth.token;
+  if (!token) return next(new Error('Authentication error'));
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET);
+    socket.userId = decoded.id; // Store user ID on socket
+    next();
+  } catch (err) {
+    next(new Error('Authentication error'));
+  }
+});
+
 io.on('connection', (socket) => {
-  console.log(`[socket] Client connected: ${socket.id}`)
+  console.log(`[socket] Client connected: ${socket.id} (User: ${socket.userId})`)
+  
+  // Join a room specific to this user so we can isolate events
+  socket.join(socket.userId)
 
   socket.on('disconnect', () => {
     console.log(`[socket] Client disconnected: ${socket.id}`)
