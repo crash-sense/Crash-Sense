@@ -37,21 +37,34 @@ mongoose.connect(MONGODB_URI)
     console.log('[server] Server will continue running; Mongoose will retry connection in the background.')
   })
 
+const allowedOrigins = [
+  CLIENT_URL,
+  'https://crash-sense.vercel.app',
+  'http://localhost:5173',
+  'http://localhost:3000'
+]
+
+const corsOptions = {
+  origin: (origin, callback) => {
+    // Allow non-browser requests (like npm package)
+    if (!origin) return callback(null, true)
+    if (allowedOrigins.includes(origin) || origin.endsWith('.vercel.app')) {
+      return callback(null, true)
+    }
+    return callback(null, true) // Permissive CORS for multi-tenant SaaS
+  },
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  credentials: true,
+  allowedHeaders: ['Content-Type', 'Authorization']
+}
+
 // Configure Socket.io with CORS
 const io = new Server(server, {
-  cors: {
-    origin: CLIENT_URL,
-    methods: ['GET', 'POST'],
-    credentials: true,
-  },
+  cors: corsOptions
 })
 
 // Configure Express CORS
-app.use(cors({
-  origin: CLIENT_URL,
-  methods: ['GET', 'POST'],
-  credentials: true,
-}))
+app.use(cors(corsOptions))
 
 // Body parser middleware
 app.use(express.json())
