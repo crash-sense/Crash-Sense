@@ -127,4 +127,17 @@ app.use((err, req, res, next) => {
 // Start server listening
 server.listen(PORT, () => {
   console.log(`[server] Server listening on port ${PORT} in ${NODE_ENV} mode`)
+
+  // ─── Self-Ping Keep-Alive (Prevents Render Free Tier from Sleeping) ─────────
+  // Render free tier sleeps after 15 minutes of inactivity.
+  // Every 14 minutes (840,000 ms), this pings /health to keep the server awake!
+  const axios = require('axios')
+  const KEEP_ALIVE_INTERVAL = 14 * 60 * 1000 // 14 minutes
+
+  setInterval(() => {
+    const backendUrl = process.env.RENDER_EXTERNAL_URL || 'https://crashsense-backend.onrender.com'
+    axios.get(`${backendUrl}/health`)
+      .then(() => console.log(`[keep-alive] Self-ping successful: ${backendUrl}/health`))
+      .catch((err) => console.error('[keep-alive] Self-ping failed:', err.message))
+  }, KEEP_ALIVE_INTERVAL)
 })
