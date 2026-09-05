@@ -250,40 +250,127 @@ Be precise. Your analysis will be used by another AI call to generate the actual
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// NODE 3 — generatePatch  ← KAVYA FILLS THIS IN
+// NODE 3 — generatePatch  (Kavya's Implementation)
 //
 // Receives: state.fileContent, state.analysis, state.crashMessage, state.lineNumber
 // Returns:  { patchedContent }  — the complete fixed file as a raw string
 // ─────────────────────────────────────────────────────────────────────────────
 function makeGeneratePatchNode(io, model) {
   return async function generatePatchNode(state) {
-    // TODO (Kavya): implement this node
-    // Hint: send state.fileContent + state.analysis to the LLM
-    // Ask it to return the complete fixed version of the file (raw code only)
-    // Strip any markdown backticks from the response before returning
-    emitProgress(io, state.crashId, '⏳ generatePatch — not implemented yet (Kavya)')
-    throw new Error('generatePatchNode not implemented yet — Kavya will add this')
+    emitProgress(io, state.crashId, '🛠️ Generating code fix with Groq AI...')
+
+    const prompt = `
+You are a senior Node.js developer. You must fix the bug in the provided source code.
+
+=== ORIGINAL FILE (${state.relPath}) ===
+${state.fileContent}
+
+=== ROOT CAUSE ANALYSIS ===
+${state.analysis}
+
+=== CRASH DETAILS ===
+Error: ${state.crashName}: ${state.crashMessage}
+Crashed at line: ${state.lineNumber}
+
+=== STRICT INSTRUCTIONS ===
+1. Return the COMPLETE, valid, syntax-correct file content.
+2. Fix ONLY the bug by replacing or updating the broken code at/around line ${state.lineNumber}.
+3. Do NOT duplicate existing lines (like app.listen or route definitions).
+4. Do NOT include markdown code fences (no \`\`\` or \`\`\`javascript).
+5. Do NOT include explanations, commentary, or extra conversational text.
+6. Output ONLY raw executable JavaScript code.
+`.trim()
+
+    const response = await model.invoke(
+      [new HumanMessage(prompt)],
+      { temperature: 0.1, maxTokens: 2048 }
+    )
+
+    let patchedContent = response.content.trim()
+
+    // Strip markdown code fences if the LLM still includes them
+    if (patchedContent.startsWith('```')) {
+      patchedContent = patchedContent.replace(/^```[a-z]*\n?/, '').replace(/\n?```$/, '').trim()
+    }
+
+    emitProgress(io, state.crashId, '✅ Patch generated successfully')
+
+    return { patchedContent }
   }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// NODE 4 — createPR  ← KAVYA FILLS THIS IN
+// NODE 4 — createPR  (Kavya's Implementation)
 //
 // Receives: state.crashId, state.relPath, state.patchedContent, state.crashMessage
 // Returns:  { prUrl }  — the GitHub Pull Request URL
 // ─────────────────────────────────────────────────────────────────────────────
 function makeCreatePRNode(io, userOctokit, githubOwner, githubRepo) {
   return async function createPRNode(state) {
-    // TODO (Kavya): implement this node
-    // Steps:
-    //   1. Get HEAD SHA of main branch (octokit.git.getRef)
-    //   2. Create new branch "crashsense-fix-{crashId}" (octokit.git.createRef)
-    //   3. Get file blob SHA (octokit.repos.getContent on new branch)
-    //   4. Commit patchedContent to new branch (octokit.repos.createOrUpdateFileContents)
-    //   5. Open PR from new branch → main (octokit.pulls.create)
-    //   6. Return { prUrl: prData.html_url }
-    emitProgress(io, state.crashId, '⏳ createPR — not implemented yet (Kavya)')
-    throw new Error('createPRNode not implemented yet — Kavya will add this')
+    emitProgress(io, state.crashId, '🚀 Creating branch & Pull Request on GitHub...')
+
+    // Step 1: Get HEAD SHA of main branch
+    const { data: mainRef } = await userOctokit.git.getRef({
+      owner: githubOwner,
+      repo: githubRepo,
+      ref: 'heads/main',
+    })
+    const latestSHA = mainRef.object.sha
+
+    // Step 2: Create unique branch name using the crashId
+    const branchName = `crashsense-fix-${state.crashId}`
+
+    // Step 3: Create the new branch ref on GitHub
+    await userOctokit.git.createRef({
+      owner: githubOwner,
+      repo: githubRepo,
+      ref: `refs/heads/${branchName}`,
+      sha: latestSHA,
+    })
+
+    // Step 4: Get file SHA on the new branch (required by GitHub API to update a file)
+    const { data: fileData } = await userOctokit.repos.getContent({
+      owner: githubOwner,
+      repo: githubRepo,
+      path: state.relPath,
+      ref: branchName,
+    })
+
+    // Step 5: Commit the patched content to the new branch
+    await userOctokit.repos.createOrUpdateFileContents({
+      owner: githubOwner,
+      repo: githubRepo,
+      path: state.relPath,
+      message: `[CrashSense] Auto-fix for ${state.crashName}: ${state.crashMessage}`,
+      content: Buffer.from(state.patchedContent).toString('base64'),
+      sha: fileData.sha,
+      branch: branchName,
+    })
+
+    // Step 6: Open a Pull Request from branchName -> main
+    const { data: pr } = await userOctokit.pulls.create({
+      owner: githubOwner,
+      repo: githubRepo,
+      title: `[CrashSense] Auto-fix: ${state.crashName}: ${state.crashMessage}`,
+      head: branchName,
+      base: 'main',
+      body: `## CrashSense Auto-Patch
+
+**Crash ID:** \`${state.crashId}\`
+**Error:** \`${state.crashName}: ${state.crashMessage}\`
+**File:** \`${state.relPath}\` (line ${state.lineNumber})
+
+### Root Cause Analysis
+${state.analysis}
+
+---
+*Generated automatically by CrashSense Agentic AI Pipeline.*`,
+    })
+
+    const prUrl = pr.html_url
+    emitProgress(io, state.crashId, `🎉 Pull Request opened: ${prUrl}`)
+
+    return { prUrl }
   }
 }
 
@@ -375,7 +462,7 @@ async function runPatchAgent(crash, io, config = {}) {
   // We create one model instance shared between nodes 2 and 3.
   const model = new ChatGroq({
     apiKey: process.env.GROQ_API_KEY,
-    model:  'llama-3.3-70b-versatile',
+    model:  'groq/compound-mini',
   })
 
   // ── Build and compile the LangGraph pipeline ──────────────────────────────
