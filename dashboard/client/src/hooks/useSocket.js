@@ -80,3 +80,31 @@ export function useSocket(eventName, callback) {
 
   return getSocket()
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// usePatchProgress — Person 1 (Friend) adds this
+//
+// A convenience hook that wires up all 4 Auto-Patch Socket.io events for
+// a given crashId. Kavya's AIChat.jsx calls this hook and passes callback
+// functions for each event.
+//
+// Events handled:
+//   patch:start:{crashId}    → pipeline just started
+//   patch:progress:{crashId} → step update string (e.g. "Fetching file...")
+//   patch:done:{crashId}     → { prUrl } — PR was created
+//   patch:error:{crashId}    → error message string
+//
+// Usage in AIChat.jsx (Kavya fills this in):
+//   usePatchProgress(crash._id, {
+//     onProgress: (msg) => setPatchProgress(msg),
+//     onDone:     ({ prUrl }) => setPrUrl(prUrl),
+//     onError:    (err) => setPatchError(err),
+//   })
+// ─────────────────────────────────────────────────────────────────────────────
+export function usePatchProgress(crashId, { onStart, onProgress, onDone, onError } = {}) {
+  // Subscribe to each patch event — useSocket handles cleanup automatically
+  useSocket(crashId ? `patch:start:${crashId}`    : null, onStart    || (() => {}))
+  useSocket(crashId ? `patch:progress:${crashId}` : null, onProgress || (() => {}))
+  useSocket(crashId ? `patch:done:${crashId}`     : null, onDone     || (() => {}))
+  useSocket(crashId ? `patch:error:${crashId}`    : null, onError    || (() => {}))
+}
