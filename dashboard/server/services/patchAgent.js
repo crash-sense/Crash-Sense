@@ -462,7 +462,7 @@ async function runPatchAgent(crash, io, config = {}) {
   // We create one model instance shared between nodes 2 and 3.
   const model = new ChatGroq({
     apiKey: process.env.GROQ_API_KEY,
-    model:  'groq/compound-mini',
+    model:  'llama3-70b-8192',
   })
 
   // ── Build and compile the LangGraph pipeline ──────────────────────────────
